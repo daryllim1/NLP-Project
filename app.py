@@ -58,24 +58,47 @@ def discover_result_files() -> List[Path]:
     return sorted(Path(".").glob("results_*.json"))
 
 
-def render_results_table(results_payload: dict) -> None:
+def format_dataset_label(dataset_block: dict, fallback: str) -> str:
+    if not dataset_block:
+        return fallback
+    source = dataset_block.get("source") or fallback
+    split = dataset_block.get("split")
+    return f"{source} ({split})" if split else str(source)
+
+
+def dataframe_from_payload(payload: dict) -> pd.DataFrame:
     rows = []
-    for item in results_payload.get("results", []):
-        rouge = item.get("rouge", {})
-        rows.append(
-            {
-                "Model": item.get("model_name"),
-                "ROUGE-1": round(rouge.get("rouge1", 0.0), 4),
-                "ROUGE-2": round(rouge.get("rouge2", 0.0), 4),
-                "ROUGE-L": round(rouge.get("rougeL", 0.0), 4),
-                "BERTScore F1": round(item.get("bertscore_f1", 0.0), 4),
-            }
-        )
-    if not rows:
-        st.info("No results found in the uploaded JSON.")
+
+    def append_rows(dataset_label: str, results: List[dict]) -> None:
+        for item in results:
+            rouge = item.get("rouge", {})
+            rows.append(
+                {
+                    "Dataset": dataset_label,
+                    "Model": item.get("model_name"),
+                    "ROUGE-1": round(rouge.get("rouge1", 0.0), 4),
+                    "ROUGE-2": round(rouge.get("rouge2", 0.0), 4),
+                    "ROUGE-L": round(rouge.get("rougeL", 0.0), 4),
+                    "BERTScore F1": round(item.get("bertscore_f1", 0.0), 4),
+                }
+            )
+
+    if "combined" in payload:
+        for block in payload["combined"]:
+            dataset_label = format_dataset_label(block.get("dataset", {}), block.get("source_file", "dataset"))
+            append_rows(dataset_label, block.get("results", []))
+    else:
+        dataset_label = format_dataset_label(payload.get("dataset", {}), "dataset")
+        append_rows(dataset_label, payload.get("results", []))
+
+    return pd.DataFrame(rows)
+
+
+def render_results_table(results_payload: dict) -> None:
+    df = dataframe_from_payload(results_payload)
+    if df.empty:
+        st.info("No results found in the JSON payload.")
         return
-    df = pd.DataFrame(rows)
-    st.subheader("Model Comparison")
     st.table(df)
 
 

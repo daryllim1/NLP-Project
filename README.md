@@ -19,9 +19,14 @@ It sequentially launches:
 Each run writes its metrics to the JSON paths defined inside `run_default_benchmarks.py`.
 
 ## 3. Streamlit Front End
-Launch an interactive dashboard for visualizing metrics and trying summaries by hand:
-```
-streamlit run app.py
-```
-- Looks for any`results_*.json` file from `summarization_experiment.py` to compare ROUGE/BERTScore across models.
-- Paste text or upload a `.txt` file, pick a model (ELMo, Bert2Bert, or BART), and generate a live summary directly in the browser.
+ Launch an interactive dashboard for visualizing metrics and trying summaries by hand:
+ ```
+ streamlit run app.py
+ ```
+ - Automatically discovers any `results_*.json` file from `summarization_experiment.py` to compare ROUGE/BERTScore across models (switch files via the dropdown).
+ - If you want to view several datasets in one table, run e.g.
+   ```
+   python combine_results.py --inputs results_cnn.json results_gov.json results_pubmed.json --output combined_results.json
+   ```
+   then open `combined_results.json` in the dashboard.
+ - Paste text or upload a `.txt` file, pick a model (ELMo, Bert2Bert, or BART), and generate a live summary directly in the browser.
