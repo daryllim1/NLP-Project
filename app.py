@@ -23,8 +23,10 @@ from summarization_experiment import (  # type: ignore
     ModelConfig,
     ModelType,
     default_model_suite,
+    determine_max_input_tokens,
     ensure_punkt,
     summarize_document_elmo,
+    summarize_transformer_document,
 )
 
 
@@ -35,6 +37,8 @@ st.set_page_config(page_title="Summarization Benchmark Dashboard", layout="wide"
 def load_transformer_pipeline(model_id: str, tokenizer_id: Optional[str], device_idx: int):
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_id or model_id, use_fast=True)
     model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
+    if hasattr(model.config, "max_position_embeddings") and model.config.max_position_embeddings:
+        tokenizer.model_max_length = model.config.max_position_embeddings
     return pipeline("summarization", model=model, tokenizer=tokenizer, device=device_idx)
 
 
@@ -44,14 +48,15 @@ def summarize_text(model_cfg: ModelConfig, text: str, device_idx: int) -> str:
         return summarize_document_elmo(text, model_cfg.num_summary_sentences)
 
     summarizer = load_transformer_pipeline(model_cfg.model_id, model_cfg.tokenizer_id, device_idx)
-    result = summarizer(
+    tokenizer = summarizer.tokenizer
+    max_input_tokens = determine_max_input_tokens(tokenizer, summarizer.model)
+    return summarize_transformer_document(
         text,
-        max_length=model_cfg.max_summary_tokens,
-        min_length=model_cfg.min_summary_tokens,
-        truncation=True,
-        num_beams=model_cfg.num_beams,
+        summarizer,
+        tokenizer,
+        model_cfg,
+        max_input_tokens,
     )
-    return result[0]["summary_text"].strip()
 
 
 def discover_result_files() -> List[Path]:

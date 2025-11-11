@@ -36,6 +36,9 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, pipeline
 ELMO_MODULE_URL = "https://tfhub.dev/google/elmo/3"
 _ELMO_MODEL: Optional[object] = None
 BERTSCORE_MODEL_TYPE = "roberta-large"
+CHUNK_SIZE_TOKENS = 900
+CHUNK_OVERLAP_TOKENS = 100
+MAX_MAP_REDUCE_STEPS = 3
 
 
 class ModelType(str, Enum):
@@ -63,6 +66,104 @@ class ModelConfig:
     def __post_init__(self) -> None:
         if isinstance(self.model_type, str):
             self.model_type = ModelType(self.model_type)
+
+
+def determine_max_input_tokens(tokenizer, model) -> int:
+    max_tokens = getattr(tokenizer, "model_max_length", None)
+    if max_tokens is None or max_tokens < 0 or max_tokens > 100000:
+        max_tokens = getattr(model.config, "max_position_embeddings", 1024) or 1024
+        tokenizer.model_max_length = max_tokens
+    return int(max_tokens)
+
+
+def chunk_text_by_tokens(tokenizer, text: str, chunk_size: int, overlap: int) -> List[str]:
+    token_ids = tokenizer.encode(text, truncation=False, add_special_tokens=False)
+    if not token_ids:
+        return []
+    step = max(chunk_size - overlap, 1)
+    chunks: List[str] = []
+    for start in range(0, len(token_ids), step):
+        window = token_ids[start : start + chunk_size]
+        if not window:
+            break
+        chunks.append(tokenizer.decode(window, skip_special_tokens=True, clean_up_tokenization_spaces=True))
+        if start + chunk_size >= len(token_ids):
+            break
+    return chunks
+
+
+def run_pipeline_summary(
+    summarizer,
+    text: str,
+    max_summary_tokens: int,
+    min_summary_tokens: int,
+    num_beams: int,
+) -> str:
+    result = summarizer(
+        text,
+        max_length=max_summary_tokens,
+        min_length=min_summary_tokens,
+        truncation=True,
+        num_beams=num_beams,
+    )
+    return result[0]["summary_text"].strip()
+
+
+def summarize_transformer_document(
+    text: str,
+    summarizer,
+    tokenizer,
+    model_cfg: ModelConfig,
+    max_input_tokens: int,
+    chunk_size_tokens: int = CHUNK_SIZE_TOKENS,
+    chunk_overlap_tokens: int = CHUNK_OVERLAP_TOKENS,
+    depth: int = 0,
+) -> str:
+    token_ids = tokenizer.encode(text, truncation=False, add_special_tokens=False)
+    if len(token_ids) <= max_input_tokens or depth >= MAX_MAP_REDUCE_STEPS:
+        return run_pipeline_summary(
+            summarizer,
+            text,
+            model_cfg.max_summary_tokens,
+            model_cfg.min_summary_tokens,
+            model_cfg.num_beams,
+        )
+
+    chunk_size = min(chunk_size_tokens, max_input_tokens)
+    overlap = min(chunk_overlap_tokens, chunk_size - 1) if chunk_size > 1 else 0
+    windows = chunk_text_by_tokens(tokenizer, text, chunk_size, overlap)
+    if not windows:
+        return run_pipeline_summary(
+            summarizer,
+            text,
+            model_cfg.max_summary_tokens,
+            model_cfg.min_summary_tokens,
+            model_cfg.num_beams,
+        )
+
+    summaries: List[str] = []
+    for window in windows:
+        summaries.append(
+            run_pipeline_summary(
+                summarizer,
+                window,
+                model_cfg.max_summary_tokens,
+                model_cfg.min_summary_tokens,
+                model_cfg.num_beams,
+            )
+        )
+
+    combined_text = " ".join(summaries)
+    return summarize_transformer_document(
+        combined_text,
+        summarizer,
+        tokenizer,
+        model_cfg,
+        max_input_tokens,
+        chunk_size_tokens,
+        chunk_overlap_tokens,
+        depth + 1,
+    )
 
 
 @dataclass
@@ -144,30 +245,24 @@ def chunked(iterable: Iterable[str], batch_size: int) -> Iterable[List[str]]:
 
 def generate_transformer_summaries(
     summarizer,
+    tokenizer,
     inputs: List[str],
-    batch_size: int,
-    max_summary_tokens: int,
-    min_summary_tokens: int,
-    num_beams: int,
+    model_cfg: ModelConfig,
     desc: str,
 ) -> List[str]:
-    """Run model inference and return cleaned summaries."""
+    """Run model inference with optional map-reduce windowing."""
     outputs: List[str] = []
-    total_batches = (len(inputs) + batch_size - 1) // batch_size
-    for batch in tqdm(
-        chunked(inputs, batch_size),
-        total=total_batches,
-        desc=desc,
-    ):
-        predictions = summarizer(
-            batch,
-            max_length=max_summary_tokens,
-            min_length=min_summary_tokens,
-            truncation=True,
-            num_beams=num_beams,
+    max_input_tokens = determine_max_input_tokens(tokenizer, summarizer.model)
+    for text in tqdm(inputs, total=len(inputs), desc=desc):
+        outputs.append(
+            summarize_transformer_document(
+                text,
+                summarizer,
+                tokenizer,
+                model_cfg,
+                max_input_tokens,
+            )
         )
-        for prediction in predictions:
-            outputs.append(prediction["summary_text"].strip())
     return outputs
 
 
@@ -302,11 +397,9 @@ def evaluate_model(
         )
         predictions = generate_transformer_summaries(
             summarizer,
+            tokenizer,
             inputs,
-            batch_size=model_cfg.batch_size,
-            max_summary_tokens=model_cfg.max_summary_tokens,
-            min_summary_tokens=model_cfg.min_summary_tokens,
-            num_beams=model_cfg.num_beams,
+            model_cfg,
             desc=f"Summarizing with {model_cfg.name}",
         )
     elif model_cfg.model_type == ModelType.ELMO_EXTRACTIVE:
