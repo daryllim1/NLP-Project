@@ -289,6 +289,8 @@ def evaluate_model(
         tokenizer_id = model_cfg.tokenizer_id or model_cfg.model_id
         tokenizer = AutoTokenizer.from_pretrained(tokenizer_id, use_fast=True)
         model = AutoModelForSeq2SeqLM.from_pretrained(model_cfg.model_id)
+        if hasattr(model.config, "max_position_embeddings") and model.config.max_position_embeddings:
+            tokenizer.model_max_length = model.config.max_position_embeddings
         summarizer = pipeline(
             "summarization",
             model=model,

@@ -1,0 +1,75 @@
+{
+  "dataset": {
+    "source": "ccdv/pubmed-summarization",
+    "split": "train",
+    "text_column": "article",
+    "summary_column": "abstract",
+    "num_examples": 98
+  },
+  "results": [
+    {
+      "model_name": "ELMo-Extractive",
+      "rouge": {
+        "rouge1": 0.29957491012082244,
+        "rouge2": 0.0874306580736744,
+        "rougeL": 0.17400328433370726,
+        "rougeLsum": 0.24589158215434206
+      },
+      "bertscore_f1": 0.8225744999184901,
+      "metadata": {
+        "model_id": "tfhub/google-elmo-3",
+        "tokenizer_id": null,
+        "model_type": "elmo_extractive",
+        "num_examples": 98,
+        "max_input_tokens": 1024,
+        "max_summary_tokens": 128,
+        "num_beams": 4,
+        "num_summary_sentences": 3,
+        "bertscore_model_type": "roberta-large",
+        "elmo_module_url": "https://tfhub.dev/google/elmo/3"
+      }
+    },
+    {
+      "model_name": "Bert2Bert-CNN",
+      "rouge": {
+        "rouge1": 0.1963927779617101,
+        "rouge2": 0.06314942272252447,
+        "rougeL": 0.13318028495781362,
+        "rougeLsum": 0.16681382476657886
+      },
+      "bertscore_f1": 0.8181205519608089,
+      "metadata": {
+        "model_id": "patrickvonplaten/bert2bert_cnn_daily_mail",
+        "tokenizer_id": "patrickvonplaten/bert2bert_cnn_daily_mail",
+        "model_type": "transformer",
+        "num_examples": 98,
+        "max_input_tokens": 512,
+        "max_summary_tokens": 130,
+        "num_beams": 4,
+        "num_summary_sentences": 3,
+        "bertscore_model_type": "roberta-large"
+      }
+    },
+    {
+      "model_name": "BART-Large-CNN",
+      "rouge": {
+        "rouge1": 0.2433933670742712,
+        "rouge2": 0.0866128662724425,
+        "rougeL": 0.16331547840427652,
+        "rougeLsum": 0.2026618931681965
+      },
+      "bertscore_f1": 0.8272242211565679,
+      "metadata": {
+        "model_id": "facebook/bart-large-cnn",
+        "tokenizer_id": "facebook/bart-large-cnn",
+        "model_type": "transformer",
+        "num_examples": 98,
+        "max_input_tokens": 1024,
+        "max_summary_tokens": 140,
+        "num_beams": 4,
+        "num_summary_sentences": 3,
+        "bertscore_model_type": "roberta-large"
+      }
+    }
+  ]
+}

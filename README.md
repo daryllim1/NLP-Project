@@ -11,6 +11,7 @@ Use the helper script to reproduce the three canonical HF benchmarks in one go:
 ```bash
 python run_default_benchmarks.py --use-gpu   # drop --use-gpu if you only have CPU
 ```
+Add `--predictions-dir outputs/preds` if you want per-example summaries saved for each dataset (they'll be grouped under `outputs/preds/<dataset>_<split>/`).
 It sequentially launches:
 - `cnn_dailymail` (config `3.0.0`, split `validation`)
 - `ccdv/govreport-summarization` (split `train`)
