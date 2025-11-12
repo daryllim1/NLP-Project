@@ -184,15 +184,14 @@ def render_summarizer_tab() -> None:
 def main() -> None:
     st.title("Summarization Benchmark + Playground")
     st.write(
-        "Drop in your evaluation results and experiment with the bundled models—all from one screen."
+        "Drop in your evaluation results and experiment with the bundled models, all from one screen."
     )
 
-    results_tab, summarizer_tab = st.tabs(["📊 Results Dashboard", "📝 Summarizer"])
+    results_tab, summarizer_tab = st.tabs(["Results Dashboard", "Summarizer"])
     with results_tab:
         render_results_tab()
     with summarizer_tab:
         render_summarizer_tab()
-
 
 if __name__ == "__main__":
     main()
